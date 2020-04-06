@@ -23,10 +23,11 @@ class PID():
         return p+i+d
 
 class Drone():
-    def __init__(self, initial_pos=np.zeros(3)):
+    def __init__(self, pybullet_client, initial_pos=np.zeros(3)):
         self.initial_pos = initial_pos
+        self.pybullet_client = pybullet_client
         self.pos = self.initial_pos
-        self.body_id = p.loadURDF("/auto/homes/jb2270/l310_project/drone.urdf", basePosition=self.pos)
+        self.body_id = p.loadURDF("/auto/homes/jb2270/l310_project/drone.urdf", basePosition=self.pos, physicsClientId=self.pybullet_client)
         self.pids = [
             PID(10000, 0, 0),
             PID(10000, 0, 0),
@@ -35,11 +36,11 @@ class Drone():
         self.reset()	
 
     def update_pos(self):
-        return np.array(p.getBasePositionAndOrientation(self.body_id)[0])
+        return np.array(p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.pybullet_client)[0])
 
     def reset(self):
         self.last_pos = self.pos = self.update_pos()
-        p.resetBasePositionAndOrientation(self.body_id, self.initial_pos, [0, 0, 0, 1])
+        p.resetBasePositionAndOrientation(self.body_id, self.initial_pos, [0, 0, 0, 1], physicsClientId=self.pybullet_client)
 
     def step(self, desired_speed):
         desired_speed = np.clip(desired_speed, -0.05, 0.05)
@@ -49,7 +50,7 @@ class Drone():
 
         pid_vec = np.array([ctrl.step(setpoint, feedback) for ctrl, setpoint, feedback in zip(self.pids, np.array(desired_speed), self.speed)])
         pid_vec_clipped = np.clip(pid_vec, -30, 30) # simulate physical constraints
-        p.applyExternalForce(self.body_id, 0, pid_vec_clipped, self.pos, p.WORLD_FRAME)
+        p.applyExternalForce(self.body_id, 0, pid_vec_clipped, self.pos, p.WORLD_FRAME, physicsClientId=self.pybullet_client)
 
 class SimEnv(gym.Env):
     def __init__(self, config):
@@ -60,9 +61,9 @@ class SimEnv(gym.Env):
         self.client = p.connect(p.GUI if self.cfg['render'] else p.DIRECT)
         p.setGravity(0, 0, -10, physicsClientId=self.client) 
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
-        self.plane_id = p.loadURDF("plane.urdf")
+        self.plane_id = p.loadURDF("plane.urdf", physicsClientId=self.client)
 
-        self.drone = Drone(config['init'])
+        self.drone = Drone(self.client, config['init'])
         
         self.reset()
 
@@ -78,7 +79,7 @@ class SimEnv(gym.Env):
 
     def step(self, action):
         self.drone.step(action)
-        p.stepSimulation()
+        p.stepSimulation(physicsClientId=self.client)
 
         #reward = 0
         dist_to_goal = np.linalg.norm(self.drone.pos - self.goal, ord=2)
