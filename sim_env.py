@@ -54,10 +54,10 @@ class Drone():
 class SimEnv(gym.Env):
     def __init__(self, config):
         self.cfg = config
-        self.action_space = Box(-1, 1, shape=(3,), dtype=float)
+        self.action_space = Box(-0.05, 0.05, shape=(3,), dtype=float)
         self.observation_space = Box(-np.inf, np.inf, shape=(6,), dtype=np.float32)
 
-        self.client = p.connect(p.DIRECT)
+        self.client = p.connect(p.GUI if self.cfg['render'] else p.DIRECT)
         p.setGravity(0, 0, -10, physicsClientId=self.client) 
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         self.plane_id = p.loadURDF("plane.urdf")
