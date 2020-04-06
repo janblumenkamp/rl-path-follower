@@ -40,8 +40,8 @@ if __name__ == '__main__':
     #exit()
     
     register_env("pybullet", lambda config: SimEnv(config))
-    with open("cfg.yaml", "rb") as f:
-        cfg = yaml.load(f)
+    #with open("cfg.yaml", "rb") as f:
+    #    cfg = yaml.load(f)
     
     ray.init()
     tune.run(
@@ -54,7 +54,7 @@ if __name__ == '__main__':
             "kl_coeff": 0.5,
             "clip_rewards": True,
             "clip_param": 0.3,
-            "vf_clip_param": 1000.0,
+            "vf_clip_param": 10.0,
             #"vf_share_layers": True,
             #"vf_loss_coeff": 1e-4,
             "entropy_coeff": 0.01,
@@ -69,6 +69,10 @@ if __name__ == '__main__':
             "batch_mode": "truncate_episodes",
             "observation_filter": "NoFilter",
             "num_gpus": 1,
+            "model": {
+                "fcnet_activation": "relu",
+                "fcnet_hiddens": [256, 256],
+            },
             "env_config": {
                   'init': [0, 0, 1],
                    'goal_box': 5

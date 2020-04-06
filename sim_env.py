@@ -26,11 +26,11 @@ class Drone():
     def __init__(self, initial_pos=np.zeros(3)):
         self.initial_pos = initial_pos
         self.pos = self.initial_pos
-        self.body_id = p.loadURDF("./drone.urdf", basePosition=self.pos)
+        self.body_id = p.loadURDF("/auto/homes/jb2270/l310_project/drone.urdf", basePosition=self.pos)
         self.pids = [
-            PID(10000, 200, 50000),
-            PID(10000, 200, 50000),
-            PID(10000, 200, 50000)
+            PID(10000, 0, 0),
+            PID(10000, 0, 0),
+            PID(10000, 0, 0)
         ]
         self.reset()	
 
@@ -42,6 +42,7 @@ class Drone():
         p.resetBasePositionAndOrientation(self.body_id, self.initial_pos, [0, 0, 0, 1])
 
     def step(self, desired_speed):
+        desired_speed = np.clip(desired_speed, -0.05, 0.05)
         self.pos = self.update_pos()
         self.speed = self.pos - self.last_pos
         self.last_pos = self.pos
@@ -53,10 +54,10 @@ class Drone():
 class SimEnv(gym.Env):
     def __init__(self, config):
         self.cfg = config
-        self.action_space = Box(-0.05, 0.05, shape=(3,), dtype=float)
+        self.action_space = Box(-1, 1, shape=(3,), dtype=float)
         self.observation_space = Box(-np.inf, np.inf, shape=(6,), dtype=np.float32)
 
-        self.client = p.connect(p.GUI)
+        self.client = p.connect(p.DIRECT)
         p.setGravity(0, 0, -10, physicsClientId=self.client) 
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         self.plane_id = p.loadURDF("plane.urdf")
@@ -69,24 +70,25 @@ class SimEnv(gym.Env):
         p.disconnect()
 
     def reset(self):
-        self.last_pos = self.drone.pos
         self.drone.reset()
         rand_box = lambda s: np.random.uniform(-s, s, 3) + np.array([0, 0, 0.5 + s])
         self.goal = rand_box(self.cfg['goal_box'])
+        self.cnt_timesteps_goal_reached = 0
         return self.step([0,0,0])[0]
 
     def step(self, action):
         self.drone.step(action)
         p.stepSimulation()
 
-        new_pos = self.drone.pos
-        d_last_pos_to_goal = np.linalg.norm(self.last_pos - self.goal, ord=2)
-        d_new_pos_to_goal = np.linalg.norm(new_pos - self.goal, ord=2)
-        reward = d_last_pos_to_goal - d_new_pos_to_goal
-        if reward < 0.0:
-            reward *= 2
-        self.last_pos = new_pos
-        speed = np.linalg.norm(self.drone.speed, ord=2)
-        done = (d_new_pos_to_goal < 0.1 and speed < 0.001) or d_new_pos_to_goal > 5
-        return np.concatenate([new_pos, self.drone.speed], axis=0), reward*100, done, {}
+        #reward = 0
+        dist_to_goal = np.linalg.norm(self.drone.pos - self.goal, ord=2)
+        reward = -dist_to_goal/100
+        if dist_to_goal < 0.1:
+            self.cnt_timesteps_goal_reached += 1
+        #    reward += 1
+        else:
+            self.cnt_timesteps_goal_reached = 0
+
+        done = dist_to_goal > 5 or self.cnt_timesteps_goal_reached > 100
+        return np.concatenate([self.drone.pos - self.goal, self.drone.speed], axis=0), reward, done, {}
 
