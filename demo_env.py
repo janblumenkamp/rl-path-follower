@@ -4,36 +4,40 @@ from gym.spaces import Box
 
 class DemoEnv(gym.Env):
     def __init__(self, config):
-        self.action_space = Box(-np.inf, np.inf, shape=(3,))
-        self.observation_space = Box(-np.inf, np.inf, shape=(3,))
+        self.cfg = config
+        self.action_space = Box(-np.inf, np.inf, shape=(self.cfg['dim'],))
+        self.observation_space = Box(-np.inf, np.inf, shape=(2 * self.cfg['dim'],)) # current and next waypoint
         
         self.reset()
 
     def reset(self):
-        self.last_pos = self.pos = np.array([0.0,0.0,0.0])
-        rand_box = lambda s: np.random.uniform(-s, s, 3) + np.array([0, 0, 0.5 + s])
-        self.goal = rand_box(2)
-        self.last_dist = np.linalg.norm(self.pos - self.goal, ord=2)
-        self.cnt_timesteps_goal_reached = 0
-        return self.step([0,0,0])[0]
+        self.pos = np.array([0.0]*self.cfg['dim'])
+        rand_box = lambda s: np.random.uniform(-s, s, self.cfg['dim'])
+        self.waypoints = np.array([rand_box(3) for _ in range(self.cfg['waypoints'])])
+        self.current_waypoint_index = 0
+        return self.step([0]*self.cfg['dim'])[0]
 
     def step(self, action):
         self.pos += np.clip(action, -0.5, 0.5)
-        #self.speed = (self.pos - self.last_pos)*240 # Pybullet timestep length
-        #self.last_pos = self.pos.copy()
 
         reward = 0
-        dist_to_goal = np.linalg.norm(self.pos - self.goal, ord=2)
-        #reward = self.last_dist - dist_to_goal
-        #self.last_dist = dist_to_goal
-        if dist_to_goal < 0.5:
-            self.cnt_timesteps_goal_reached += 1
-            reward = 5
+        current_waypoint_rel = self.pos - self.waypoints[self.current_waypoint_index]
+        next_waypoint_index = self.current_waypoint_index
+        if next_waypoint_index < len(self.waypoints)-1:
+            next_waypoint_index += 1
+        next_waypoint_rel = self.pos - self.waypoints[next_waypoint_index]
+        
+        dist_to_current = np.linalg.norm(current_waypoint_rel, ord=2)
+        done = dist_to_current > 10
+        if dist_to_current < 0.5:
+            reward = 10
+            if self.current_waypoint_index < len(self.waypoints) - 1:
+                self.current_waypoint_index += 1
+            else:
+                done = True
         else:
-            self.cnt_timesteps_goal_reached = 0
             reward = -0.1
 
-        done = dist_to_goal > 10 or self.cnt_timesteps_goal_reached > 30
-        state = self.pos - self.goal#np.concatenate([self.pos - self.goal, self.speed], axis=0)
+        state = np.concatenate([current_waypoint_rel, next_waypoint_rel], axis=0)
         return state, reward, done, {}
 

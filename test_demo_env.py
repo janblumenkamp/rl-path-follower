@@ -11,22 +11,25 @@ from demo_env import DemoEnv
 
 if __name__ == '__main__':
 
-    env = DemoEnv({})
+    env = DemoEnv({
+        "dim": 2,
+        "waypoints": 4
+    })
 
     try:
         obs = env.reset()
         cum_reward = 0
-        for i in range(100):
-            goal_vec = -obs[:3]
+        for i in range(1000):
+            goal_vec = -obs[:2]
             goal_d = np.linalg.norm(goal_vec, ord=2)
             if goal_d > 0:
-                goal_vec /= np.abs(goal_vec).max()
-            print("a", goal_vec)
+                goal_vec /= np.abs(goal_vec).max()*3
+            #print("a", goal_vec)
             #goal_vec /= 100
-            if goal_d < 0.5:
-                goal_vec /= 5
+
             obs, reward, done, _ = env.step(goal_vec)#env.action_space.sample())
             cum_reward += reward
+            #print(obs)
             print(obs, reward, cum_reward, done)
             if done:                
                 input(f"{i} Done")
