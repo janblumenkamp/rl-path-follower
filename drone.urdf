@@ -22,13 +22,13 @@
 
      <link name="FL">
        <visual>
-		 <origin xyz="0.16 0.13 0" rpy="0 0 0" />
+		 <origin xyz="0.2 0.2 0" rpy="0 0 0" />
          <geometry>
             <cylinder length="0.03" radius="0.13"/>
          </geometry>
        </visual>
        <collision>
-          <origin xyz="0.16 0.13 0" rpy="0 0 0" />
+          <origin xyz="0.2 0.2 0" rpy="0 0 0" />
           <geometry>
             <cylinder length="0.03" radius="0.13"/>
           </geometry>
@@ -40,13 +40,13 @@
      </link>
      <link name="FR">
        <visual>
-		 <origin xyz="0.16 -0.13 0" rpy="0 0 0" />
+		 <origin xyz="0.2 -0.2 0" rpy="0 0 0" />
          <geometry>
             <cylinder length="0.03" radius="0.13"/>
          </geometry>
        </visual>
        <collision>
-          <origin xyz="0.16 -0.13 0" rpy="0 0 0" />
+          <origin xyz="0.2 -0.2 0" rpy="0 0 0" />
           <geometry>
             <cylinder length="0.03" radius="0.13"/>
           </geometry>
@@ -58,13 +58,13 @@
      </link>
      <link name="BL">
        <visual>
-		 <origin xyz="-0.09 0.13 0" rpy="0 0 0" />
+		 <origin xyz="-0.2 0.2 0" rpy="0 0 0" />
          <geometry>
             <cylinder length="0.03" radius="0.13"/>
          </geometry>
        </visual>
        <collision>
-          <origin xyz="-0.09 0.13 0" rpy="0 0 0" />
+          <origin xyz="-0.2 0.2 0" rpy="0 0 0" />
           <geometry>
             <cylinder length="0.03" radius="0.13"/>
           </geometry>
@@ -76,13 +76,13 @@
      </link>
      <link name="BR">
        <visual>
-		 <origin xyz="-0.09 -0.13 0" rpy="0 0 0" />
+		 <origin xyz="-0.2 -0.2 0" rpy="0 0 0" />
          <geometry>
             <cylinder length="0.03" radius="0.13"/>
          </geometry>
        </visual>
        <collision>
-          <origin xyz="-0.09 -0.13 0" rpy="0 0 0" />
+          <origin xyz="-0.2 -0.2 0" rpy="0 0 0" />
           <geometry>
             <cylinder length="0.03" radius="0.13"/>
           </geometry>
