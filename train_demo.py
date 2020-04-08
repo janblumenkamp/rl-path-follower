@@ -28,13 +28,13 @@ if __name__ == '__main__':
             "num_sgd_iter": 10,
             "num_workers": 16,
             "num_envs_per_worker": 16,
-            "lr": 1e-3,
-            "gamma": 0.9,
+            "lr": 1e-4,
+            "gamma": 0.99,
             "batch_mode": "truncate_episodes",
             "observation_filter": "NoFilter",
             "num_gpus": 1,
             "env_config": {
-                "dim": 2,
+                "dim": 3,
                 "waypoints": 4
             },
             "model": {

@@ -35,8 +35,6 @@ class DemoEnv(gym.Env):
                 self.current_waypoint_index += 1
             else:
                 done = True
-        else:
-            reward = -0.1
 
         state = np.concatenate([current_waypoint_rel, next_waypoint_rel], axis=0)
         return state, reward, done, {}
