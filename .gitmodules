@@ -1,0 +1,3 @@
+[submodule "pybullet_multicopter"]
+	path = pybullet_multicopter
+	url = git@github.com:janblumenkamp/pybullet_multicopter.git
