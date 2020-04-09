@@ -38,20 +38,20 @@ class Drone():
         self.orientation_euler = np.array(p.getEulerFromQuaternion(orientation))
 
     def compute_speed(self):
-        self.trans_speed = (self.last_position - self.position)*240
+        self.lateral_speed = (self.last_position - self.position)*240
         delta_speed_quat = p.getDifferenceQuaternion(self.last_orientation, self.orientation)
         self.ang_speed = np.array(p.getEulerFromQuaternion(delta_speed_quat))*240
         self.last_orientation = self.orientation
         self.last_position = self.position
 
     def set_thrust(self, thrust):
-        self.thrust = thrust
+        self.thrust = np.clip(thrust, 0, 6)
 
     def set_pitch(self, pitch):
-        self.setpoint_pitch = np.clip(pitch, -np.pi/8, np.pi/8)
+        self.setpoint_pitch = np.clip(pitch, -np.pi/4, np.pi/4)
 
     def set_roll(self, roll):
-        self.setpoint_roll = np.clip(roll, -np.pi/8, np.pi/8)
+        self.setpoint_roll = np.clip(roll, -np.pi/4, np.pi/4)
 
     def set_yaw(self, yaw):
         self.setpoint_yaw = np.clip(yaw, -2*np.pi, 2*np.pi)
@@ -69,7 +69,7 @@ class Drone():
             self.thrust - ctrl_roll - ctrl_pitch,
             self.thrust + ctrl_roll + ctrl_pitch,
             self.thrust - ctrl_roll + ctrl_pitch,
-        ]), -5, 5)
+        ]), -8, 8)
         yaw_torque = np.clip(ctrl_yaw, -0.5, 0.5)
 
         motor_points = np.array([[1,1,0], [1,-1,0], [-1,1,0], [-1,-1,0]])*0.2
@@ -83,7 +83,7 @@ class Drone():
         p.applyExternalForce(self.body_id, -1, self.simulated_wind_vector, self.position, p.WORLD_FRAME, physicsClientId=self.pybullet_client)
 
     def step_speed(self, vx, vy, vz):
-        self.set_pitch(self.pid_vx.step(vx, -self.trans_speed[0]))
-        self.set_roll(self.pid_vy.step(vy, self.trans_speed[1]))
-        self.set_thrust(self.pid_vz.step(vz, -self.trans_speed[2]))
+        self.set_pitch(self.pid_vx.step(np.clip(vx, -12, 12), -self.lateral_speed[0]))
+        self.set_roll(self.pid_vy.step(np.clip(vy, -12, 12), self.lateral_speed[1]))
+        self.set_thrust(self.pid_vz.step(np.clip(vz, -7, 7), -self.lateral_speed[2]))
 
