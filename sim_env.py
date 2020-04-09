@@ -3,7 +3,7 @@ import gym
 import pybullet as p
 import pybullet_data
 from gym.spaces import Box
-from drone import Drone
+from pybullet_multicopter.copters.quadcopter import Quadcopter
 
 class SimEnv(gym.Env):
     def __init__(self, config):
@@ -16,7 +16,7 @@ class SimEnv(gym.Env):
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         self.plane_id = p.loadURDF("plane.urdf", physicsClientId=self.client)
 
-        self.drone = Drone(self.client, config['init'])
+        self.drone = Quadcopter(self.client)
         
         self.reset()
 
