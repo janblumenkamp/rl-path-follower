@@ -53,29 +53,30 @@ if __name__ == '__main__':
             "lambda": 0.95,
             "kl_coeff": 0.5,
             "clip_rewards": True,
-            "clip_param": 0.3,
+            "clip_param": 0.2,
             "vf_clip_param": 10.0,
             #"vf_share_layers": True,
             #"vf_loss_coeff": 1e-4,
             "entropy_coeff": 0.01,
-            "train_batch_size": 5000,
+            "train_batch_size": 1000,
             "sample_batch_size": 100,
             "sgd_minibatch_size": 500,
             "num_sgd_iter": 10,
-            "num_workers": 8,
-            "num_envs_per_worker": 10,
+            "num_workers": 4,
+            "num_envs_per_worker": 5,
             "lr": 1e-4,
-            "gamma": 0.9,
+            "gamma": 0.99,
             "batch_mode": "truncate_episodes",
             "observation_filter": "NoFilter",
             "num_gpus": 1,
             "model": {
                 "fcnet_activation": "relu",
-                "fcnet_hiddens": [256, 256],
+                "fcnet_hiddens": [128, 256, 128, 32],
             },
             "env_config": {
-                  'init': [0, 0, 1],
-                   'goal_box': 5
+                'init': [0, 0, 1],
+                'render': False,
+                "waypoints": 4
             }})
     
     #tune.run(

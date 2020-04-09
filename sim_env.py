@@ -3,66 +3,13 @@ import gym
 import pybullet as p
 import pybullet_data
 from gym.spaces import Box
-
-class PID():
-    def __init__(self, kp, ki, kd):
-        self.k = {'P': kp, 'I': ki, 'D': kd}
-        self.reset()
-
-    def reset(self):
-        self.integral = 0
-        self.last_error = 0
-        
-    def step(self, setpoint, feedback):
-        error = setpoint - feedback
-        self.integral += error
-        p = self.k['P']*error
-        i = self.k['I']*self.integral
-        d = self.k['D']*(error - self.last_error)
-        self.last_error = error
-        return p+i+d
-
-class Drone():
-    def __init__(self, pybullet_client, initial_pos=np.zeros(3)):
-        self.initial_pos = initial_pos
-        self.pybullet_client = pybullet_client
-        self.pos = self.initial_pos
-        import os
-        self.body_id = p.loadURDF("/auto/homes/jb2270/l310_project/drone.urdf", basePosition=self.pos, physicsClientId=self.pybullet_client)
-        self.pids = [
-            PID(10000, 0, 0),
-            PID(10000, 0, 0),
-            PID(10000, 0, 0)
-        ]
-        self.reset()	
-
-    def update_pos(self):
-        o = p.getBasePositionAndOrientation(self.body_id, physicsClientId=self.pybullet_client)
-        pos = np.array(o[0])
-        #print("pos", o)
-        return pos
-
-    def reset(self):
-        self.last_pos = self.pos = self.update_pos()
-        p.resetBasePositionAndOrientation(self.body_id, self.initial_pos, [0, 0, 0, 1], physicsClientId=self.pybullet_client)
-
-    def step(self, desired_speed):
-        desired_speed = np.clip(desired_speed, -5, 5)
-        self.pos = self.update_pos()
-        self.speed = (self.pos - self.last_pos)*240 # Pybullet timestep length
-        self.last_pos = self.pos.copy()
-        if self.speed[0] == np.nan:
-            assert(False)
-
-        pid_vec = np.array([ctrl.step(setpoint, feedback) for ctrl, setpoint, feedback in zip(self.pids, np.array(desired_speed), self.speed)])
-        pid_vec_clipped = np.clip(pid_vec, -30, 30) # simulate physical constraints
-        p.applyExternalForce(self.body_id, 0, pid_vec_clipped, self.pos, p.WORLD_FRAME, physicsClientId=self.pybullet_client)
+from drone import Drone
 
 class SimEnv(gym.Env):
     def __init__(self, config):
         self.cfg = config
-        self.action_space = Box(-np.inf, np.inf, shape=(3,), dtype=np.float32)
-        self.observation_space = Box(-np.inf, np.inf, shape=(6,), dtype=np.float32)
+        self.action_space = Box(-12, 12, shape=(3,), dtype=float)
+        self.observation_space = Box(-np.inf, np.inf, shape=(6,), dtype=np.float32) # current destination, next destination
 
         self.client = p.connect(p.GUI if self.cfg['render'] else p.DIRECT)
         p.setGravity(0, 0, -10, physicsClientId=self.client) 
@@ -78,27 +25,39 @@ class SimEnv(gym.Env):
 
     def reset(self):
         self.drone.reset()
-        rand_box = lambda s: np.random.uniform(-s, s, 3) + np.array([0, 0, 0.5 + s])
-        self.goal = rand_box(self.cfg['goal_box'])
-        self.cnt_timesteps_goal_reached = 0
+        rand_box = lambda s: np.random.uniform(-s, s, 3) + np.array([0, 0, s])
+        self.waypoints = np.array([rand_box(3) for _ in range(self.cfg['waypoints'])])
+        self.current_waypoint_index = 0
         return self.step([0,0,0])[0]
 
     def step(self, action):
-        print("a", action)
-        self.drone.step(action)
+        
+        self.drone.step_speed(action[0], -action[1], action[2])
+        self.drone.step()
         p.stepSimulation(physicsClientId=self.client)
 
+        m = np.array(p.getMatrixFromQuaternion(self.drone.orientation)).reshape(3,3)
+                
         reward = 0
-        dist_to_goal = np.linalg.norm(self.drone.pos - self.goal, ord=2)
-        #reward = -dist_to_goal/100
-        if dist_to_goal < 0.3:
-            self.cnt_timesteps_goal_reached += 1
-            reward += 10
-        else:
-            self.cnt_timesteps_goal_reached = 0
-            reward -= 0.1
+        current_waypoint_rel = self.drone.position - self.waypoints[self.current_waypoint_index] @ m
+        next_waypoint_index = self.current_waypoint_index
+        if next_waypoint_index < len(self.waypoints)-1:
+            next_waypoint_index += 1
+        next_waypoint_rel = self.drone.position - self.waypoints[next_waypoint_index] @ m
+        
+        dist_to_current = np.linalg.norm(current_waypoint_rel, ord=2)
+        done = dist_to_current > 10
+        if dist_to_current < 0.5:
+            reward = 10
+            if self.current_waypoint_index < len(self.waypoints) - 1:
+                self.current_waypoint_index += 1
+            else:
+                done = True
 
-        done = dist_to_goal > 2*self.cfg['goal_box'] or self.cnt_timesteps_goal_reached > 30
-        print("v", self.drone.speed)
-        return np.concatenate([self.drone.pos - self.goal, self.drone.speed], axis=0), reward, done, {}
+        return np.concatenate([current_waypoint_rel, next_waypoint_rel], axis=0), reward, done, {}
 
+    def render(self):
+        for i in range(1, len(self.waypoints)):
+            p.addUserDebugLine(self.waypoints[i-1], self.waypoints[i], lineColorRGB=[1,0,0], lineWidth=3, physicsClientId=self.client)
+            p.addUserDebugText(str(i), self.waypoints[i-1], textColorRGB=[1,0,0])
+        

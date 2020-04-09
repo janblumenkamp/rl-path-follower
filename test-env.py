@@ -8,24 +8,35 @@ np.random.seed(1)
 def run():
     cfg = {
         'init': [0, 0, 1],
-        'goal_box': 5
+        'render': True,
+        "waypoints": 4
     }
 
     env = SimEnv(cfg)
 
     try:
-        env.reset()
-        time.sleep(2)
-        reached_goal = False
-        for i in range(1000):
-            goal_vec = env.goal - env.drone.pos
-            goal_vec /= np.abs(goal_vec).max()*100
-            obs, reward, done, _ = env.step(np.array([0,0,0] if reached_goal else goal_vec, dtype=float))
-            print(obs, reward, done)
+        obs = env.reset()
+        cum_reward = 0
+        for i in range(10000):
+            goal_vec = -obs[:3]
+            goal_d = np.linalg.norm(goal_vec, ord=2)
+            goal_vec /= np.abs(goal_vec).max()*2
+
+            #goal_vec /= 100
+            #if goal_d < 0.5:
+            #    goal_vec /= 3
+            if i == 0:
+                env.render()
+            obs, reward, done, _ = env.step(goal_vec)#env.action_space.sample())
+            cum_reward += reward
+            #print(obs, reward, cum_reward, done)
+            print(obs[6:])
             time.sleep(1./240.)
-            if done:
-                reached_goal = True
-                print("DONE")
+            #time.sleep(1./10)
+            if done:                
+                input("Done")
+                obs = env.reset()
+                cum_reward = 0
                 #break
     except Exception as e:
         del env
