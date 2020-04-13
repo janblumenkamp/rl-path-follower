@@ -1,20 +1,8 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
-import argparse
-import matplotlib.pylab as plt
-import matplotlib.patches as patches
 import numpy as np
-import os
-import re
-import scipy.signal
-import yaml
 import pybullet as p
 import pybullet_data
 import time
 from pybullet_multicopter.copters.quadcopter import Quadcopter
-from pybullet_multicopter.util.pid import PID
 
 #np.random.seed(2)
 
