@@ -1,13 +1,23 @@
-from sim_env import SimEnv
+from sim_env import SimEnv, FeedbackNormalizedSimEnv
 import time
 import numpy as np  
 np.random.seed(1)
 
 # Can alternatively pass in p.DIRECT 
 
+X = 0
+Y = 1
+Z = 2
+YAW = 3
+EPSILON = 0.1
+
+def feedback_linearized(orientation, velocity, epsilon):
+    u = velocity[X]*np.cos(orientation) + velocity[Y]*np.sin(orientation)  # [m/s]
+    w = (1/epsilon)*(-velocity[X]*np.sin(orientation) + velocity[Y]*np.cos(orientation))  # [rad/s] going counter-clockwise.
+    return u, w
+    
 def run():
     cfg = {
-        'init': [0, 0, 1],
         'render': True,
         "waypoints": 4
     }
@@ -16,26 +26,57 @@ def run():
 
     try:
         obs = env.reset()
+        env.render()
         cum_reward = 0
-        for i in range(10000):
-            goal_vec = -obs[:3]
-            goal_d = np.linalg.norm(goal_vec, ord=2)
-            goal_vec /= np.abs(goal_vec).max()*2
-
-            #goal_vec /= 100
-            #if goal_d < 0.5:
-            #    goal_vec /= 3
-            if i == 0:
-                env.render()
-            obs, reward, done, _ = env.step(goal_vec)#env.action_space.sample())
+        for i in range(20000):
+            orientation = obs[0]
+            next_pos = obs[4:7]
+            
+            position = np.array([
+                EPSILON * np.cos(orientation),
+                EPSILON * np.sin(orientation),
+                0], dtype=np.float32)
+            v = (next_pos - position)*3
+            u, w = feedback_linearized(orientation, v, epsilon=EPSILON)
+            h = v[2]
+            
+            obs, reward, done, _ = env.step(np.array([u, h, w]))#env.action_space.sample())
             cum_reward += reward
             #print(obs, reward, cum_reward, done)
-            print(obs[6:])
             time.sleep(1./240.)
             #time.sleep(1./10)
             if done:                
                 input("Done")
                 obs = env.reset()
+                env.render()
+                cum_reward = 0
+                #break
+    except Exception as e:
+        del env
+        print("Exit", e)
+
+def runfb():
+    cfg = {
+        'render': True,
+        "waypoints": 4
+    }
+
+    env = FeedbackNormalizedSimEnv(cfg)
+
+    try:
+        obs = env.reset()
+        env.render()
+        cum_reward = 0
+        for i in range(20000):
+            obs, reward, done, _ = env.step(np.array([EPSILON, 3]))#env.action_space.sample())
+            cum_reward += reward
+            #print(obs, reward, cum_reward, done)
+            time.sleep(1./240.)
+            #time.sleep(1./10)
+            if done:                
+                input("Done")
+                obs = env.reset()
+                env.render()
                 cum_reward = 0
                 #break
     except Exception as e:
@@ -43,7 +84,7 @@ def run():
         print("Exit", e)
 
 if __name__ == '__main__':
-    run()
+    runfb()
     exit()
 '''
 d = Drone()
