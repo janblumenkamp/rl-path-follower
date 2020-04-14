@@ -10,7 +10,7 @@ class SimEnv(gym.Env):
     def __init__(self, config):
         self.cfg = config
         self.action_space = Box(-np.inf, np.inf, shape=(3,), dtype=float)
-        self.observation_space = Box(-np.inf, np.inf, shape=(7,), dtype=np.float32) # orientation, relative current destination, next destination
+        self.observation_space = Box(-np.inf, np.inf, shape=(8,), dtype=np.float32) # orientation, relative current destination, next destination
         self.path_track_length_episode = 100
         self.client = p.connect(p.GUI if self.cfg['render'] else p.DIRECT)
         p.setGravity(0, 0, -10, physicsClientId=self.client) 
@@ -37,13 +37,15 @@ class SimEnv(gym.Env):
                 break
         self.current_waypoint_index = 0
         self.next_waypoint_index = 1
-        
+        self.timestep = 0
+
     def reset(self):
         self._reset()
         return self.step([0,0,0])[0]
 
     def step(self, action):
         assert(not any(np.isnan(action)))
+        self.timestep += 1
         self.drone.step_speed(action[0], 0, action[1])
         self.drone.set_yaw(action[2])
         self.drone.step()
@@ -57,7 +59,7 @@ class SimEnv(gym.Env):
         next_waypoint_rel = (self.waypoints[self.next_waypoint_index] - self.drone.position)
         
         dist_to_current = np.linalg.norm(current_waypoint_rel, ord=2)
-        done = dist_to_current > 2
+        done = dist_to_current > 2 or self.timestep > 20000
         if dist_to_current < 0.1:
             reward = 1
             if self.current_waypoint_index < self.path_track_length_episode:
@@ -65,7 +67,8 @@ class SimEnv(gym.Env):
             else:
                 done = True
 
-        return np.concatenate([[self.drone.orientation_euler[2]], current_waypoint_rel, next_waypoint_rel], axis=0), reward, done, {}
+        yaw = self.drone.orientation_euler[2]
+        return np.concatenate([[np.sin(yaw), np.cos(yaw)], current_waypoint_rel, next_waypoint_rel], axis=0), reward, done, {}
 
     def render(self):
         for i in range(1, len(self.waypoints)):
@@ -83,7 +86,7 @@ class FeedbackNormalizedSimEnv(SimEnv):
 
     def reset(self):
         super()._reset()
-        return self.step([0.1,1])[0]
+        return self.step([1,0])[0]
 
     def step(self, action):
         orientation = self.drone.orientation_euler[2]

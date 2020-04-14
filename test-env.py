@@ -28,9 +28,9 @@ def run():
         obs = env.reset()
         env.render()
         cum_reward = 0
-        for i in range(20000):
-            orientation = obs[0]
-            next_pos = obs[4:7]
+        for i in range(30000):
+            orientation = np.arctan2(obs[0], obs[1])
+            next_pos = obs[5:8]
             
             position = np.array([
                 EPSILON * np.cos(orientation),
@@ -42,11 +42,11 @@ def run():
             
             obs, reward, done, _ = env.step(np.array([u, h, w]))#env.action_space.sample())
             cum_reward += reward
-            #print(obs, reward, cum_reward, done)
-            time.sleep(1./240.)
+            print(obs, reward, cum_reward, done)
+            #time.sleep(1./240.)
             #time.sleep(1./10)
             if done:                
-                input("Done")
+                input(f"{i} Done")
                 obs = env.reset()
                 env.render()
                 cum_reward = 0
@@ -70,7 +70,7 @@ def runfb():
         for i in range(20000):
             obs, reward, done, _ = env.step(np.array([EPSILON, 3]))#env.action_space.sample())
             cum_reward += reward
-            #print(obs, reward, cum_reward, done)
+            print(obs, reward, cum_reward, done)
             time.sleep(1./240.)
             #time.sleep(1./10)
             if done:                
@@ -84,7 +84,7 @@ def runfb():
         print("Exit", e)
 
 if __name__ == '__main__':
-    runfb()
+    run()
     exit()
 '''
 d = Drone()
