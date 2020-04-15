@@ -78,6 +78,7 @@ class SimEnv(gym.Env):
         m = self.drone.get_rotation_matrix()
         state = np.concatenate([
             #np.array([[np.sin(o), np.cos(o)] for o in self.drone.orientation_euler]).flatten(),
+            #np.array([[np.sin(o), np.cos(o)] for o in [self.drone.orientation_euler[2]]]).flatten(),
             #current_waypoint_rel,
             #next_waypoint_rel,
             current_waypoint_rel @ m,
