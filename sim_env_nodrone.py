@@ -74,9 +74,9 @@ class Quadcopter():
 class SimEnv(gym.Env):
     def __init__(self, config):
         self.cfg = config
-        self.action_space = Box(-np.inf, np.inf, shape=(3,), dtype=float)
+        self.action_space = Box(-1, 1, shape=(3,), dtype=np.float32)
         self.observation_space = Box(-np.inf, np.inf, shape=(17,), dtype=np.float32) # orientation, relative current destination, next destination
-        self.path_track_length_episode = 100
+        self.path_track_length_episode = 250
 
         self.drone = Quadcopter()
         CONFIG_SPACE_SIZE = 4
@@ -91,7 +91,7 @@ class SimEnv(gym.Env):
         self.drone.reset()
         while True:
             self.waypoints = self.path_generator.get_path(self.get_drone_pose(), self.path_generator.sample_configuration_space())
-            if len(self.waypoints) >= self.path_track_length_episode:
+            if len(self.waypoints) > self.path_track_length_episode:
                 break
         self.current_waypoint_index = 0
         self.next_waypoint_index = 1
@@ -104,6 +104,7 @@ class SimEnv(gym.Env):
 
     def step(self, action):
         assert(not any(np.isnan(action)))
+        action *= np.array([2, 1, 1])
         self.timestep += 1
         self.drone.step_speed(action[0], 0, action[1])
         self.drone.set_yaw(action[2])
@@ -160,7 +161,7 @@ class SimEnv(gym.Env):
 class FeedbackNormalizedSimEnv(SimEnv):
     def __init__(self, cfg):
         SimEnv.__init__(self, cfg)
-        self.action_space = Box(0.001, np.inf, shape=(2,), dtype=float)
+        self.action_space = Box(0.01, 5, shape=(2,), dtype=np.float32)
 
     def feedback_linearized(self, orientation, velocity, epsilon):
         u = velocity[0]*np.cos(orientation) + velocity[1]*np.sin(orientation)  # [m/s]
@@ -172,8 +173,7 @@ class FeedbackNormalizedSimEnv(SimEnv):
         return self.step([1,0])[0]
 
     def step(self, action):
-        if action[0] < 0.001:	
-            action[0] = 0.001	
+        action = np.array(action) * [0.2, 1]
         orientation = self.drone.orientation_euler[2]
         next_pos = (self.waypoints[self.next_waypoint_index] - self.drone.position)
         
