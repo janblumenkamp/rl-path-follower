@@ -67,11 +67,8 @@ class Node(object):
         self._cost = c
 
 class PathGenerator():
-    def __init__(self, configuration_space):
-        self.configuration_space = configuration_space
-
-    def sample_configuration_space(self):
-        return np.array([np.random.uniform(low=self.configuration_space[dim][0], high=self.configuration_space[dim][1]) for dim in [X, Y, Z]])
+    def __init__(self):
+        pass
 
     def adjust_pose(self, node, final_position):
         final_pose = node.pose.copy().astype(np.float)
