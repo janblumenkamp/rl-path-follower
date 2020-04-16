@@ -24,13 +24,6 @@ class SimEnv(gym.Env):
     def __del__(self):
         p.disconnect()
 
-    def get_simple_rotation_matrix(self):
-        s, c = np.sin(self.drone.orientation_euler[2]), np.cos(self.drone.orientation_euler[2])
-        return np.array([
-            [c, -s, 0],
-            [s, c, 0],
-            [0, 0, 1]])
-
     def get_drone_pose(self):
         return np.array(list(self.drone.position)+[self.drone.orientation_euler[2]])
 
@@ -39,6 +32,7 @@ class SimEnv(gym.Env):
         while True:
             self.waypoints = self.path_generator.get_path(self.get_drone_pose())
             if len(self.waypoints) >= self.cfg['ep_end_after_n_waypoints']:
+                self.waypoints = self.waypoints[:self.cfg['ep_end_after_n_waypoints']+1]
                 break
         self.current_waypoint_index = 0
         self.next_waypoint_index = 1
@@ -77,7 +71,7 @@ class SimEnv(gym.Env):
                 done = True
         m = self.drone.get_rotation_matrix()
         state = np.concatenate([
-            #np.array([[np.sin(o), np.cos(o)] for o in self.drone.orientation_euler]).flatten(),
+            #np.array([[np.sin(o), np.cos(o)] for o in [self.drone.orientation_euler[2]]]).flatten(),
             #current_waypoint_rel,
             #next_waypoint_rel,
             current_waypoint_rel @ m,
@@ -90,14 +84,14 @@ class SimEnv(gym.Env):
         ], axis=0)
         return state, reward, done, {}
 
-    def render(self, _):
+    def render(self, _=None):
         for i in range(1, len(self.waypoints)):
             p.addUserDebugLine(self.waypoints[i-1], self.waypoints[i], lineColorRGB=[1,0,0], lineWidth=3, physicsClientId=self.client)
 
 class FeedbackNormalizedSimEnv(SimEnv):
     def __init__(self, cfg):
         SimEnv.__init__(self, cfg)
-        self.action_space = Box(-np.inf, np.inf, shape=(2,), dtype=float)
+        self.action_space = Box(-1, 1, shape=(2,), dtype=float)
 
     def feedback_linearized(self, orientation, velocity, epsilon):
         u = velocity[0]*np.cos(orientation) + velocity[1]*np.sin(orientation)  # [m/s]
@@ -109,22 +103,20 @@ class FeedbackNormalizedSimEnv(SimEnv):
         return self.step([1,0])[0]
 
     def step(self, action):
-        if action[0] < 0.001:
-            action[0] = 0.001
-            
-        #action[0] = np.clip(action[0], 0.1, 0.2)
-        #action[1] = np.clip(action[1], 3, 4)
-        #action[0] = 0.1
-        #action[1] = 0.3
+        epsilon = (action[0] + 1.0)/2 + 0.001 # [0.001, 1.001]
+        gamma = (action[1] + 1) * 3 # [0, 6]
+        assert(epsilon >= 0.001 and epsilon <= 1.001)
+        assert(gamma >= 0.0 and gamma <= 6.0)
+
         orientation = self.drone.orientation_euler[2]
         next_pos = (self.waypoints[self.next_waypoint_index] - self.drone.position)
         
         position = np.array([
-            action[0] * np.cos(orientation),
-            action[0] * np.sin(orientation),
+            epsilon * np.cos(orientation),
+            epsilon * np.sin(orientation),
             0], dtype=np.float32)
-        v = (next_pos - position)*action[1]
-        u, w = self.feedback_linearized(orientation, v, epsilon=action[0])
+        v = (next_pos - position)*gamma
+        u, w = self.feedback_linearized(orientation, v, epsilon=epsilon)
         h = v[2]
 
         return super().step(np.array([u, h, w]))

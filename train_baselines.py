@@ -17,17 +17,19 @@ import time
 import os
 import numpy as np
 
-log_dir = "/auto/homes/jb2270/gym/"
+log_dir = "/auto/homes/jb2270/gym/0005"
 
 def make_env(rank, seed=0):
     def _init():
         env = SimEnv({
-            'dim': 3,
-            'init': [0, 0, 1],
             'render': False,
-            "waypoints": 4
+            'ep_end_after_n_waypoints': 200,
+            'max_timesteps_between_checkpoints': 2000,
+            'dist_waypoint_abort_ep': 2,
+            'minimum_drone_height': 0.2,
+            'dist_waypoint_proceed': 0.8,
         })
-        env = Monitor(env, log_dir if rank == 0 else None, allow_early_resets=True)
+        env = Monitor(env, None if rank == 0 else None, allow_early_resets=True)
         env.seed(seed + rank)
         return env
     set_global_seeds(seed)
@@ -123,16 +125,8 @@ class CustomPolicy(FeedForwardPolicy):
 def train():
     env = SubprocVecEnv([make_env(i) for i in range(16)])
     #env = VecMonitor(env, log_dir+"monitor.csv")
-    '''
-    env = SimEnv({
-            'dim': 3,
-            'init': [0, 0, 1],
-            'render': False,
-            "waypoints": 4
-        })
+    #env = make_env(0)()
     
-    env = Monitor(env, log_dir, allow_early_resets=True)
-    '''
     callback = SavePeriodicCallback(check_freq=1000, log_dir=log_dir)
 
     model = PPO2(CustomPolicy, env, verbose=1, nminibatches=8, n_steps=32, cliprange=0.2, gamma=0.99)
