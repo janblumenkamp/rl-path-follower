@@ -149,7 +149,7 @@ class PathGenerator():
                     continue
                 current_parent.add_neighbor(v)
                 v.parent = current_parent
-                if current_len > 5:
+                if current_len > 20:
                     final_node = v
                     break
                 current_len += 1
