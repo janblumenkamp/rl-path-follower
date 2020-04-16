@@ -1,16 +1,16 @@
 import gym
 from gym.spaces import Box
-#from sim_env import SimEnv, FeedbackNormalizedSimEnv
-from sim_env_nodrone import SimEnv, FeedbackNormalizedSimEnv
+from sim_env import SimEnv, FeedbackNormalizedSimEnv
+#from sim_env_nodrone import SimEnv, FeedbackNormalizedSimEnv
 import tensorflow as tf
 
 from stable_baselines.bench import Monitor
-from stable_baselines.common.vec_env import SubprocVecEnv
+from stable_baselines.common.vec_env import SubprocVecEnv, DummyVecEnv
 from stable_baselines.common import set_global_seeds
 from stable_baselines import PPO2, A2C
 from stable_baselines.results_plotter import load_results, ts2xy
 
-from stable_baselines.common.policies import FeedForwardPolicy
+from stable_baselines.common.policies import FeedForwardPolicy, MlpLstmPolicy, MlpPolicy
 
 
 import time
@@ -18,7 +18,7 @@ import os
 import numpy as np
 
 log_dir = "/auto/homes/jb2270/gym/"
-    
+
 def make_env(rank, seed=0):
     def _init():
         env = SimEnv({
@@ -86,12 +86,38 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                   self.model.save(self.save_path)
         return True
 
+class SavePeriodicCallback(BaseCallback):
+    """
+    Callback for saving a model (the check is done every ``check_freq`` steps)
+    based on the training reward (in practice, we recommend using ``EvalCallback``).
+
+    :param check_freq: (int)
+    :param log_dir: (str) Path to the folder where the model will be saved.
+      It must contains the file created by the ``Monitor`` wrapper.
+    :param verbose: (int)
+    """
+    def __init__(self, check_freq: int, log_dir: str, verbose=1):
+        super(SavePeriodicCallback, self).__init__(verbose)
+        self.check_freq = check_freq
+        self.log_dir = log_dir
+        self.save_path = os.path.join(log_dir, 'best_model')
+
+    def _init_callback(self) -> None:
+        # Create folder if needed
+        if self.save_path is not None:
+            os.makedirs(self.save_path, exist_ok=True)
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.check_freq == 0:
+            self.model.save(self.save_path)
+        return True
+
 # Custom MLP policy of three layers of size 128 each
 class CustomPolicy(FeedForwardPolicy):
     def __init__(self, *args, **kwargs):
         super(CustomPolicy, self).__init__(*args, **kwargs,
-                                            act_fun=tf.nn.tanh,
-                                           net_arch=[dict(pi=[128, 128, 128, 128, 128, 128], vf=[128, 128, 128, 128])],
+                                           # act_fun=tf.nn.tanh,
+                                           net_arch=[dict(pi=[128, 128, 128, 128], vf=[128, 128, 128, 128])],
                                            feature_extraction="mlp")
 
 def train():
@@ -107,16 +133,16 @@ def train():
     
     env = Monitor(env, log_dir, allow_early_resets=True)
     '''
-    callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_dir)
+    callback = SavePeriodicCallback(check_freq=1000, log_dir=log_dir)
 
-    model = PPO2(CustomPolicy, env, verbose=1, nminibatches=32, n_steps=512)#, cliprange=0.3, gamma=0.95)
+    model = PPO2(CustomPolicy, env, verbose=1, nminibatches=8, n_steps=32, cliprange=0.2, gamma=0.99)
     #model = A2C(CustomPolicy, env, verbose=1, n_steps=32, gamma=0.95)
-    model.learn(total_timesteps=int(2e6),callback=callback)
+    model.learn(total_timesteps=int(100e6),callback=callback)
     model.save(log_dir + "model")
 
 
 def run():
-    model = PPO2.load(log_dir + "best_model")
+    model = PPO2.load("./results/best_model_nodrone")
     env = make_env(0)() #SubprocVecEnv([make_env(i) for i in range(1)])
     obs = env.reset()
     cum_rew = 0
@@ -133,5 +159,5 @@ def run():
     env.close()
     
 if __name__ == '__main__':
-    run()
-    #train()
+    #run()
+    train()
