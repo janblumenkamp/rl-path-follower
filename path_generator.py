@@ -15,9 +15,10 @@ YAW = 3
 class Node(object):
     def __init__(self, pose):
         assert(len(pose.shape) == 1 and pose.shape[0] == 4)
-        self._pose = pose.copy()
+        self._pose = pose.copy().astype(np.float)
         self._neighbors = []
         self._parent = None
+        self._cost = 0
 
     @property
     def pose(self):
@@ -43,6 +44,10 @@ class Node(object):
 
     @property
     def position(self):
+        return self._pose[:YAW]
+
+    @property
+    def position2D(self):
         return self._pose[:Z]
 
     @property
@@ -53,6 +58,14 @@ class Node(object):
     def direction(self):
         return np.array([np.cos(self._pose[YAW]), np.sin(self._pose[YAW])], dtype=np.float32)
 
+    @property
+    def cost(self):
+        return self._cost
+
+    @cost.setter
+    def cost(self, c):
+        self._cost = c
+
 class PathGenerator():
     def __init__(self, configuration_space):
         self.configuration_space = configuration_space
@@ -62,9 +75,9 @@ class PathGenerator():
 
     def adjust_pose(self, node, final_position):
         final_pose = node.pose.copy().astype(np.float)
-        final_pose[:Z] = final_position[:Z]
+        final_pose[:YAW] = final_position
 
-        dp = final_pose[:Z] - node.position
+        dp = final_pose[:Z] - node.position[:Z]
         beta = np.arctan2(dp[X], dp[Y]) + node.yaw # gamma + alpha
         final_pose[YAW] = node.yaw + np.pi - 2*beta
 
@@ -73,7 +86,16 @@ class PathGenerator():
         while final_pose[YAW] < -np.pi:
             final_pose[YAW] += 2*np.pi
 
-        return Node(final_pose)
+        final_node = Node(final_pose)
+
+        c, r = self.find_circle(node, final_node)
+        def get_angle_to_node(nd):
+            dp1 = nd.pose[:Z] - c
+            return np.arctan2(dp1[Y], dp1[X])
+        angle_node = get_angle_to_node(node)
+        angle_final_node = get_angle_to_node(final_node)
+        final_node.cost = node.cost + np.abs(angle_node - angle_final_node)*r
+        return final_node
 
     def find_circle(self, node_a, node_b):
         def perpendicular(v):
@@ -82,19 +104,19 @@ class PathGenerator():
             w[Y] = v[X]
             return w
         db = perpendicular(node_b.direction)
-        dp = node_a.position - node_b.position
+        dp = node_a.position2D - node_b.position2D
         t = np.dot(node_a.direction, db)
         if np.abs(t) < 1e-3:
             # By construction node_a and node_b should be far enough apart,
             # so they must be on opposite end of the circle.
-            center = (node_b.position + node_a.position) / 2.
-            radius = np.linalg.norm(center - node_b.position)
+            center = (node_b.position2D + node_a.position2D) / 2.
+            radius = np.linalg.norm(center - node_b.position2D)
         else:
             radius = np.dot(node_a.direction, dp) / t
-            center = radius * db + node_b.position
+            center = radius * db + node_b.position2D
         return center, np.abs(radius)
 
-    def _get_path(self, final_node, start_height, end_height):
+    def _get_path(self, final_node):
         # Construct path from RRT solution.
         if final_node is None:
             return []
@@ -108,11 +130,12 @@ class PathGenerator():
         offset = 0.
         points_x = []
         points_y = []
+        points_z = []
         for u, v in zip(path, path[1:]):
             center, radius = self.find_circle(u, v)
-            du = u.position - center
+            du = u.position2D - center
             theta1 = np.arctan2(du[1], du[0])
-            dv = v.position - center
+            dv = v.position2D - center
             theta2 = np.arctan2(dv[1], dv[0])
             # Check if the arc goes clockwise.
             clockwise = np.cross(u.direction, du).item() > 0.
@@ -131,31 +154,36 @@ class PathGenerator():
             offset = distance - (theta2 - angles[-1]) * radius
             points_x.extend(center[X] + np.cos(angles) * radius)
             points_y.extend(center[Y] + np.sin(angles) * radius)
-        points_z = np.linspace(start_height, end_height, len(points_x))
+            points_z.extend(np.linspace(u.position[Z], v.position[Z], len(angles)))
         return np.stack((points_x, points_y, points_z), axis=-1)
 
-    def get_path(self, start_pose):
+    def get_path(self, start_pose, min_length=20):
         start_node = Node(start_pose)
         final_node = None
         current_parent = start_node
         current_len = 1
         while True:
-            position = self.sample_configuration_space()
+            position = np.array([
+                np.random.uniform(low=current_parent.position[0] - 3, high=current_parent.position[0] + 3),
+                np.random.uniform(low=current_parent.position[1] - 3, high=current_parent.position[1] + 3),
+                max(0, np.random.uniform(low=current_parent.position[2] - 0.3, high=current_parent.position[2] + 0.3))
+            ])
+
             # We also verify that the angles are aligned (within pi / 4).
-            d = np.linalg.norm(position[:Z] - current_parent.position)
-            if d > .2 and d < 1.5 and current_parent.direction.dot(position[:Z] - current_parent.position) / d > np.pi/8:
+            d = np.linalg.norm(position - current_parent.position)
+            if d > .2 and d < 1.5 and current_parent.direction.dot(position[:Z] - current_parent.position2D) / d > np.pi/8:
                 v = self.adjust_pose(current_parent, position)
                 if v is None:
                     continue
                 current_parent.add_neighbor(v)
                 v.parent = current_parent
-                if current_len > 20:
+                if current_len > min_length:
                     final_node = v
                     break
                 current_len += 1
                 current_parent = v
 
-        return self._get_path(final_node, start_pose[Z], self.sample_configuration_space()[Z])
+        return self._get_path(final_node)
 
 def feedback_linearization(drone_pose, path, epsilon, kappa):
     def feedback_linearized(pose, velocity, epsilon):
