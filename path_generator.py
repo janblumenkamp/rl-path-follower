@@ -1,8 +1,8 @@
 import numpy as np
-import pybullet as p
-import pybullet_data
+#import pybullet as p
+#import pybullet_data
 import time
-from pybullet_multicopter.copters.quadcopter import Quadcopter
+#from pybullet_multicopter.copters.quadcopter import Quadcopter
 
 #np.random.seed(2)
 
@@ -61,7 +61,7 @@ class PathGenerator():
         return np.array([np.random.uniform(low=self.configuration_space[dim][0], high=self.configuration_space[dim][1]) for dim in [X, Y, Z]])
 
     def adjust_pose(self, node, final_position):
-        final_pose = node.pose.copy()
+        final_pose = node.pose.copy().astype(np.float)
         final_pose[:Z] = final_position[:Z]
 
         dp = final_pose[:Z] - node.position
@@ -74,41 +74,6 @@ class PathGenerator():
             final_pose[YAW] += 2*np.pi
 
         return Node(final_pose)
-
-    def rrt(self, start_pose, goal_position):
-        # RRT builds a graph one node at a time.
-        graph = []
-        start_node = Node(start_pose)
-        final_node = None
-        graph.append(start_node)
-        while True:
-            position = self.sample_configuration_space()
-            # With a random chance, draw the goal position.
-            if np.random.rand() < .05:
-                position = goal_position
-            # Find closest node in graph.
-            # In practice, one uses an efficient spatial structure (e.g., quadtree).
-            potential_parent = sorted(((n, np.linalg.norm(position[:Z] - n.position)) for n in graph), key=lambda x: x[1])
-            # Pick a node at least some distance away but not too far.
-            # We also verify that the angles are aligned (within pi / 4).
-            u = None
-            for n, d in potential_parent:
-                if d > .2 and d < 1.5 and n.direction.dot(position[:Z] - n.position) / d > 0.70710678118:
-                    u = n
-                    break
-            else:
-                continue
-            v = self.adjust_pose(u, position)
-            if v is None:
-                continue
-            u.add_neighbor(v)
-            v.parent = u
-            graph.append(v)
-            if np.linalg.norm(v.position - goal_position) < .1:
-                final_node = v
-                break
-
-        return start_node, final_node
 
     def find_circle(self, node_a, node_b):
         def perpendicular(v):
@@ -169,9 +134,28 @@ class PathGenerator():
         points_z = np.linspace(start_height, end_height, len(points_x))
         return np.stack((points_x, points_y, points_z), axis=-1)
 
-    def get_path(self, start_pose, end_pos):
-        start_node, final_node = self.rrt(start_pose, end_pos[:Z])
-        return self._get_path(final_node, start_pose[Z], end_pos[Z])
+    def get_path(self, start_pose):
+        start_node = Node(start_pose)
+        final_node = None
+        current_parent = start_node
+        current_len = 1
+        while True:
+            position = self.sample_configuration_space()
+            # We also verify that the angles are aligned (within pi / 4).
+            d = np.linalg.norm(position[:Z] - current_parent.position)
+            if d > .2 and d < 1.5 and current_parent.direction.dot(position[:Z] - current_parent.position) / d > np.pi/8:
+                v = self.adjust_pose(current_parent, position)
+                if v is None:
+                    continue
+                current_parent.add_neighbor(v)
+                v.parent = current_parent
+                if current_len > 5:
+                    final_node = v
+                    break
+                current_len += 1
+                current_parent = v
+
+        return self._get_path(final_node, start_pose[Z], self.sample_configuration_space()[Z])
 
 def feedback_linearization(drone_pose, path, epsilon, kappa):
     def feedback_linearized(pose, velocity, epsilon):
@@ -194,6 +178,7 @@ def feedback_linearization(drone_pose, path, epsilon, kappa):
     h = v[Z]
     return u, w, h
 
+'''
 CONFIG_SPACE_SIZE = 8
 EPSILON = 0.2
 KAPPA = 3
@@ -225,3 +210,4 @@ if __name__ == '__main__':
 
             if np.linalg.norm(get_drone_pose()[:YAW]-path[-1], ord=2) < 0.15:
                 break
+'''
