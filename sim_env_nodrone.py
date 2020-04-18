@@ -131,13 +131,13 @@ class SimEnv(gym.Env):
             np.array([[np.sin(o), np.cos(o)] for o in [self.drone.orientation_euler[2]]]).flatten(),
             current_waypoint_rel,
             next_waypoint_rel,
-            current_waypoint_rel @ m,
-            next_waypoint_rel @ m,
+            #current_waypoint_rel @ m,
+            #next_waypoint_rel @ m,
             self.drone.position
         ], axis=0)
         return state, reward, done, {}
 
-    def render(self):
+    def render(self, mode):
         if self.fig is None:
             plt.ion()
             self.fig = plt.figure(constrained_layout=True, figsize=(16, 10))
@@ -147,7 +147,7 @@ class SimEnv(gym.Env):
 
             self.ax.scatter(self.waypoints[...,0], self.waypoints[...,1], self.waypoints[...,2])
         
-        if self.timestep % 100 == 0:
+        if self.timestep % 10 == 0:
             self.im_pos.set_data(
                 [self.drone.position[0], self.drone.position[0] + 0.1*np.cos(self.drone.orientation_euler[2])],
                 [self.drone.position[1], self.drone.position[1] + 0.1*np.sin(self.drone.orientation_euler[2])]

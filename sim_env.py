@@ -32,8 +32,8 @@ class SimEnv(gym.Env):
             [s, c, 0],
             [0, 0, 1]])
 
-    def map_action(self, value, out_min, out_max):
-        return (value + 1) * (out_max - out_min) / 2 + out_min
+    def map_action(self, value, in_min, in_max, out_min, out_max):
+        return (value - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
 
     def get_drone_pose(self):
         return np.array(list(self.drone.position)+[self.drone.orientation_euler[2]])
@@ -41,29 +41,28 @@ class SimEnv(gym.Env):
     def _reset(self):
         self.drone.reset()
         self.waypoints_lookahead_amount = self.cfg['path_state_waypoints_lookahead'] * self.cfg['waypoints_lookahead_skip']
+        self.generated_path_len = 20
         while True:
-            self.waypoints = self.path_generator.get_path(self.get_drone_pose())
+            self.waypoints = self.path_generator.get_path(self.get_drone_pose(), self.generated_path_len)
             if len(self.waypoints) >= self.cfg['ep_end_after_n_waypoints']+self.waypoints_lookahead_amount:
                 self.waypoints = self.waypoints[:self.cfg['ep_end_after_n_waypoints']+self.waypoints_lookahead_amount]
                 break
+            else:
+                # increase length of generated path
+                self.generated_path_len *= 2
         self.current_waypoint_index = 0
         self.timestep = 0
-        self.prev_action = np.array([0,0,0])
         self.last_timestep_new_waypoint = 0
 
     def reset(self):
         self._reset()
         return self.step([0,0,0])[0]
 
-    def step(self, action):
-        assert(not any(np.isnan(action)) and all(np.array(action) <= 1) and all(np.array(action) >= -1))
-        u = self.map_action(action[0], -5, 5)
-        w = self.map_action(action[1], -np.pi, np.pi)
-        h = self.map_action(action[2], -2, 2)
+    def internal_step(self, u, w, h):
         self.timestep += 1
 
-        self.drone.step_speed(u, 0, w)
-        self.drone.set_yaw_rate(h)
+        self.drone.step_speed(u, 0, h)
+        self.drone.set_yaw_rate(w)
         self.drone.step_angle()
         self.drone.step()
         p.stepSimulation(physicsClientId=self.client)
@@ -81,15 +80,22 @@ class SimEnv(gym.Env):
             else:
                 done = True
         m = self.get_simple_rotation_matrix() #self.drone.get_rotation_matrix()
-        state = np.tensordot(
+        state = (np.tensordot(
             self.waypoints[
                 self.current_waypoint_index
                 :self.current_waypoint_index+self.waypoints_lookahead_amount
                 :self.cfg['waypoints_lookahead_skip']
             ] - self.drone.position, m, axes=([1],[0])
-        ).flatten()
-        self.prev_action = action
+        ) - np.array([0,0,0])).flatten()
+
         return state, reward, done, {}
+
+    def step(self, action):
+        assert(not any(np.isnan(action)) and all(np.array(action) <= 1) and all(np.array(action) >= -1))
+        u = self.map_action(action[0], -1, 1, -1, 3)
+        w = self.map_action(action[1], -1, 1, -4*np.pi, 4*np.pi)
+        h = self.map_action(action[2], -1, 1, -1, 1)
+        return self.internal_step(u, w, h)
 
     def render(self, _=None):
         for i in range(1, len(self.waypoints)):
@@ -107,12 +113,12 @@ class FeedbackNormalizedSimEnv(SimEnv):
 
     def reset(self):
         super()._reset()
-        self.prev_action = np.array([1,0])
         return self.step([1,0, 0])[0]
 
     def step(self, action):
-        epsilon = self.map_action(action[0], 0.1, 1.5)
-        gamma = self.map_action(action[1], 0.1, 10.0) # (action[1] + 1.0)/10 + 0.1 # [0.1, 2.1]
+        assert(not any(np.isnan(action)) and all(np.array(action) <= 1) and all(np.array(action) >= -1))
+        epsilon = self.map_action(action[0], -1, 1, 0.1, 1.5)
+        gamma = self.map_action(action[1], -1, 1, 0.1, 10.0)
         kappa_h = 1#mapping(action[1], -0.5, 0.5)
         #assert(epsilon >= 0.05 and epsilon <= self.cfg['dist_waypoint_proceed']+0.05)
         #assert(gamma >= 0.1 and gamma <= 2.1)
@@ -127,7 +133,4 @@ class FeedbackNormalizedSimEnv(SimEnv):
         v = (next_pos[:2] - position)*gamma
         h = next_pos[2]*kappa_h
         u, w = self.feedback_linearized(orientation, v, epsilon=epsilon)
-        state, reward, done, _ = super().step(np.array([u, h, w]))
-        self.prev_action = action
-        #state = np.array([np.linalg.norm(state[:3]), np.linalg.norm(state[3:6])])
-        return state, reward, done, {}
+        return super().internal_step(u, w, h)

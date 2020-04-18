@@ -154,7 +154,7 @@ class PathGenerator():
             points_z.extend(np.linspace(u.position[Z], v.position[Z], len(angles)))
         return np.stack((points_x, points_y, points_z), axis=-1)
 
-    def get_path(self, start_pose, min_length=20):
+    def get_path(self, start_pose, min_length):
         start_node = Node(start_pose)
         final_node = None
         current_parent = start_node
@@ -163,7 +163,7 @@ class PathGenerator():
             position = np.array([
                 np.random.uniform(low=current_parent.position[0] - 3, high=current_parent.position[0] + 3),
                 np.random.uniform(low=current_parent.position[1] - 3, high=current_parent.position[1] + 3),
-                max(0, np.random.uniform(low=current_parent.position[2] - 0.3, high=current_parent.position[2] + 0.3))
+                max(0, np.random.uniform(low=max(current_parent.position[2] - 0.5, 0.5), high=current_parent.position[2] + 0.5))
             ])
 
             # We also verify that the angles are aligned (within pi / 4).
