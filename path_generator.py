@@ -148,10 +148,11 @@ class PathGenerator():
                 if theta2 < theta1:
                     theta2 += 2. * np.pi
             angles = np.arange(theta1 + offset_a, theta2, da)
-            offset = distance - (theta2 - angles[-1]) * radius
-            points_x.extend(center[X] + np.cos(angles) * radius)
-            points_y.extend(center[Y] + np.sin(angles) * radius)
-            points_z.extend(np.linspace(u.position[Z], v.position[Z], len(angles)))
+            if len(angles) > 0:
+                offset = distance - (theta2 - angles[-1]) * radius
+                points_x.extend(center[X] + np.cos(angles) * radius)
+                points_y.extend(center[Y] + np.sin(angles) * radius)
+                points_z.extend(np.linspace(u.position[Z], v.position[Z], len(angles)))
         return np.stack((points_x, points_y, points_z), axis=-1)
 
     def get_path(self, start_pose, min_length):
