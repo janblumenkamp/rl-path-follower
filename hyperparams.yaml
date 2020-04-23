@@ -1,0 +1,64 @@
+DronePathComplex-v0:
+  n_envs: 16
+  n_timesteps: !!float 1e6
+  policy: 'MlpPolicy'
+  n_steps: 512
+  nminibatches: 32
+  lam: 0.95
+  gamma: 0.99
+  noptepochs: 8
+  ent_coef: 0.01
+  learning_rate: 0.00025
+  cliprange: 0.2
+
+DronePathComplexOpt-v0:
+  n_envs: 16
+  n_timesteps: !!float 1e6
+  policy: 'MlpPolicy'
+  n_steps: 2048
+  nminibatches: 128
+  lam: 0.9
+  gamma: 0.9999
+  noptepochs: 1
+  ent_coef: 0.0302
+  learning_rate: 0.00692185
+  cliprange: 0.2
+
+DronePathComplexFB-v0:
+  n_envs: 16
+  n_timesteps: !!float 1e6
+  policy: 'MlpPolicy'
+  n_steps: 512
+  nminibatches: 32
+  lam: 0.95
+  gamma: 0.99
+  noptepochs: 8
+  ent_coef: 0.01
+  learning_rate: 0.00025
+  cliprange: 0.2
+
+DronePathSimple-v0:
+  n_envs: 16
+  n_timesteps: !!float 1e6
+  policy: 'MlpPolicy'
+  n_steps: 128
+  nminibatches: 8
+  lam: 0.95
+  gamma: 0.95
+  noptepochs: 10
+  ent_coef: 0.01
+  learning_rate: 0.00025
+  cliprange: 0.2
+
+DronePathSimpleFB-v0:
+  n_envs: 16
+  n_timesteps: !!float 1e6
+  policy: 'MlpPolicy'
+  n_steps: 128
+  nminibatches: 8
+  lam: 0.95
+  gamma: 0.95
+  noptepochs: 10
+  ent_coef: 0.01
+  learning_rate: 0.00025
+  cliprange: 0.2
